@@ -53,12 +53,13 @@ def _run_one_impl(
     do_capture: bool = True,
     do_ingest: bool = False,
     enable_dge_notifs: bool = False,
+    force_recompile: bool = False,
     db_endpoint: str | None = None,
     db_org: str | None = None,
     db_bucket: str | None = None,
 ) -> tuple[float, Path | None]:
     """Run script, optionally capture and ingest. Returns (wall_clock, ntff_path or None)."""
-    neff, proc, elapsed = runner.run_and_discover_neff(experiment_dir, impl)
+    neff, proc, elapsed = runner.run_and_discover_neff(experiment_dir, impl, force_recompile=force_recompile)
     if proc.returncode != 0:
         if proc.stderr:
             print(proc.stderr, file=sys.stderr)
@@ -109,11 +110,14 @@ def cmd_profile(args: argparse.Namespace) -> int:
     experiments_root = Path(args.experiments_root).resolve() if args.experiments_root else None
     experiment_dir = runner.get_experiment_dir(args.experiment_name, experiments_root)
 
+    force = getattr(args, "force", False)
+
     if args.mode == "torch":
         do_ingest = args.ingest
         _run_one_impl(
             experiment_dir, "torch",
             do_capture=True, do_ingest=do_ingest, enable_dge_notifs=enable_dge,
+            force_recompile=force,
             db_endpoint=args.db_endpoint, db_org=args.db_org,
             db_bucket=args.db_bucket or _db_bucket_for_impl(args, experiment_dir, "torch", do_ingest=do_ingest),
         )
@@ -125,6 +129,7 @@ def cmd_profile(args: argparse.Namespace) -> int:
         _run_one_impl(
             experiment_dir, "nki",
             do_capture=True, do_ingest=do_ingest, enable_dge_notifs=enable_dge,
+            force_recompile=force,
             db_endpoint=args.db_endpoint, db_org=args.db_org,
             db_bucket=args.db_bucket or _db_bucket_for_impl(args, experiment_dir, "nki", do_ingest=do_ingest),
         )
@@ -144,7 +149,7 @@ def cmd_profile(args: argparse.Namespace) -> int:
 
     # Helper: ensure NEFF exists and copied into artifacts once per impl
     def _prepare_neff(impl: str) -> tuple[Path, Path]:
-        neff, proc, _ = runner.run_and_discover_neff(experiment_dir, impl)
+        neff, proc, _ = runner.run_and_discover_neff(experiment_dir, impl, force_recompile=force)
         if proc.returncode != 0:
             if proc.stderr:
                 print(proc.stderr, file=sys.stderr)
@@ -266,6 +271,9 @@ def main() -> int:
     p.add_argument("--db-org", type=str, default=None, help="InfluxDB org")
     p.add_argument("--db-bucket", type=str, default=None,
                     help="InfluxDB bucket (overrides --profile-name when set)")
+    p.add_argument("--force", action="store_true",
+                    help="Force recompile all NEFFs (clears stale binaries for both torch and NKI; "
+                         "by default only NKI NEFFs are cleaned)")
     p.set_defaults(handler=cmd_profile)
 
     args = parser.parse_args()

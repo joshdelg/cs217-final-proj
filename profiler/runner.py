@@ -30,7 +30,11 @@ def get_profiler_config(experiment_dir: Path, impl: str):
 
 
 def discover_neff(experiment_dir: Path, impl: str) -> Path | None:
-    """Find the NEFF to use: config override, or newest *.neff under experiment dir."""
+    """Find the NEFF to use: config override, or newest top-level *.neff.
+
+    Only searches the experiment dir itself (not artifacts/ subdirs) so we
+    pick up the freshly compiled NEFF rather than a stale copy.
+    """
     config = get_profiler_config(experiment_dir, impl)
     if config:
         if isinstance(config, str):
@@ -39,11 +43,16 @@ def discover_neff(experiment_dir: Path, impl: str) -> Path | None:
             p = experiment_dir / config.get("neff_path", config.get("neff_dir", ""))
         if p.exists():
             return p.resolve()
-    # Glob *.neff under experiment dir, newest by mtime
-    neffs = list(experiment_dir.rglob("*.neff"))
+    neffs = list(experiment_dir.glob("*.neff"))
     if not neffs:
         return None
     return max(neffs, key=lambda p: p.stat().st_mtime)
+
+
+def _clean_stale_neffs(experiment_dir: Path) -> None:
+    """Remove old NEFF files from experiment dir so discover_neff always finds a fresh one."""
+    for neff in experiment_dir.glob("*.neff"):
+        neff.unlink()
 
 
 def run_experiment(
@@ -52,14 +61,26 @@ def run_experiment(
     *,
     env: dict | None = None,
     timeout: int | None = None,
+    force_recompile: bool = False,
 ) -> tuple[subprocess.CompletedProcess, float]:
-    """Run run_torch.py or run_nki.py from experiment dir; return (result, wall_clock_seconds)."""
+    """Run run_torch.py or run_nki.py from experiment dir; return (result, wall_clock_seconds).
+
+    NKI NEFFs are always cleaned before running (you're iterating on those).
+    Torch NEFFs are only cleaned when force_recompile=True.
+    """
     script = experiment_dir / f"run_{impl}.py"
     if not script.exists():
         raise FileNotFoundError(f"Experiment script not found: {script}")
 
+    if impl == "nki" or force_recompile:
+        _clean_stale_neffs(experiment_dir)
+
     run_env = os.environ.copy()
     run_env["NEURON_FRAMEWORK_DEBUG"] = "1"
+    # Force single logical NeuronCore for apples-to-apples kernel comparisons.
+    # Both the compiler flag AND runtime env var must agree (Neuron requirement).
+    run_env["NEURON_CC_FLAGS"] = "--logical-nc-config=1"
+    run_env["NEURON_LOGICAL_NC_CONFIG"] = "1"
     if impl == "nki":
         run_env["XLA_IR_DEBUG"] = "1"
         run_env["XLA_HLO_DEBUG"] = "1"
@@ -85,8 +106,9 @@ def run_and_discover_neff(
     *,
     env: dict | None = None,
     timeout: int | None = None,
+    force_recompile: bool = False,
 ) -> tuple[Path | None, subprocess.CompletedProcess, float]:
     """Run experiment script and return (neff_path or None, process result, wall_clock)."""
-    proc, elapsed = run_experiment(experiment_dir, impl, env=env, timeout=timeout)
+    proc, elapsed = run_experiment(experiment_dir, impl, env=env, timeout=timeout, force_recompile=force_recompile)
     neff = discover_neff(experiment_dir, impl)
     return neff, proc, elapsed

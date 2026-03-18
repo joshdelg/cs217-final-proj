@@ -1,19 +1,19 @@
 {
   "torch": {
-    "mean": 7.6163214e-05,
+    "mean": 1.7655806e-05,
     "std": null,
     "n": 1,
     "runs": [
-      7.6163214e-05
+      1.7655806e-05
     ],
     "time_source": "total_time"
   },
   "nki": {
-    "mean": 0.000112437741,
+    "mean": 2.3094964e-05,
     "std": null,
     "n": 1,
     "runs": [
-      0.000112437741
+      2.3094964e-05
     ],
     "time_source": "total_time"
   },

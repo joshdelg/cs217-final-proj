@@ -31,6 +31,7 @@ def capture(
     if ignore_exec_errors:
         cmd.append("--ignore-exec-errors")
     env = os.environ.copy()
+    env["NEURON_LOGICAL_NC_CONFIG"] = "1"
     if enable_dge_notifs:
         cmd.append("--enable-dge-notifs")
         env["NEURON_RT_ENABLE_DGE_NOTIFICATIONS"] = "1"
@@ -44,9 +45,12 @@ def ingest(
     db_endpoint: str | None = None,
     db_org: str | None = None,
     db_bucket: str | None = None,
-    force: bool = False,
+    force: bool = True,
 ) -> subprocess.CompletedProcess:
-    """Run neuron-profile view --ingest-only to push profile into InfluxDB."""
+    """Run neuron-profile view --ingest-only to push profile into InfluxDB.
+
+    force=True (default) overwrites any previous profile data in the same bucket.
+    """
     cmd = [
         find_neuron_profile(),
         "view",
