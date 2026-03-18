@@ -9,6 +9,7 @@ os.environ.setdefault("NEURON_FRAMEWORK_DEBUG", "1")
 os.environ.setdefault("XLA_IR_DEBUG", "1")
 os.environ.setdefault("XLA_HLO_DEBUG", "1")
 
+import numpy as np
 import torch
 
 try:
@@ -27,7 +28,7 @@ TILE_N = 512
 
 @nki.jit
 def nki_tensor_add(a_input, b_input):
-    """NKI kernel: element-wise add. Tiled with affine_range loops; no SPMD."""
+    """NKI kernel: element-wise add via DMA compute (no SBUF round-trip)."""
     c_output = nl.ndarray(a_input.shape, dtype=a_input.dtype, buffer=nl.shared_hbm)
     M, N = a_input.shape
 
@@ -38,24 +39,14 @@ def nki_tensor_add(a_input, b_input):
 
     for m in nl.affine_range(M // TILE_M):
         for n in nl.affine_range(N // TILE_N):
-            a_tile = nl.ndarray(shape=(TILE_M, TILE_N), dtype=a_input.dtype, buffer=nl.sbuf)
-            b_tile = nl.ndarray(shape=(TILE_M, TILE_N), dtype=b_input.dtype, buffer=nl.sbuf)
-
-            nisa.dma_copy(
-                dst=a_tile,
-                src=a_input[m * TILE_M : (m + 1) * TILE_M, n * TILE_N : (n + 1) * TILE_N],
+            tile_slice = (
+                slice(m * TILE_M, (m + 1) * TILE_M),
+                slice(n * TILE_N, (n + 1) * TILE_N),
             )
-            nisa.dma_copy(
-                dst=b_tile,
-                src=b_input[m * TILE_M : (m + 1) * TILE_M, n * TILE_N : (n + 1) * TILE_N],
-            )
-
-            c_tile = nisa.tensor_tensor(a_tile, b_tile, nl.add)
-
-            nisa.dma_copy(
-                dst=c_output[m * TILE_M : (m + 1) * TILE_M, n * TILE_N : (n + 1) * TILE_N],
-                src=c_tile,
-            )
+            # Copy a into the output tile
+            nisa.dma_copy(dst=c_output[tile_slice], src=a_input[tile_slice])
+            # Add b into the output tile via DMA read-modify-write
+            nisa.dma_copy(dst=c_output[tile_slice], src=b_input[tile_slice], dst_rmw_op=np.add)
 
     return c_output
 
