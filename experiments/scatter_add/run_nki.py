@@ -11,6 +11,11 @@ Strategy:
       same strided row indexing as the compiler, then reduce along D_CHUNK
       and accumulate chunk sums.
 
+Tuning note (for this scatter_add workload):
+  - Sweeping `D_CHUNK` over {4, 8, 16, 32} on `MAX_DEG=32` showed best
+    `total_time` at `D_CHUNK=32`.
+  - So by default, we set `SCATTER_ADD_D_CHUNK=32` (override via env var).
+
 Sizes:
     num_nodes  = 4096
     num_edges  = 40960
@@ -39,8 +44,8 @@ FEAT_DIM = 64
 SEED = 42
 
 MAX_DEG = 32   # set from data in main()
-TILE_NODES = 128
-D_CHUNK = 8
+TILE_NODES = int(os.getenv("SCATTER_ADD_TILE_NODES", "128"))
+D_CHUNK = int(os.getenv("SCATTER_ADD_D_CHUNK", "32"))
 
 
 def build_sorted_inputs(num_nodes, num_edges, feat_dim, seed=42):
