@@ -28,7 +28,11 @@ def _load_influx_config() -> dict:
 
 
 def _apply_influx_defaults(args: argparse.Namespace) -> None:
-    """Fill in db_endpoint, db_org, db_bucket from config when not set on CLI."""
+    """Fill in db_endpoint, db_org from config when not set on CLI.
+
+    We intentionally do NOT pull db_bucket from config so that each implementation
+    (torch/nki) can use a descriptive bucket name like <experiment>_torch / <experiment>_nki.
+    """
     config = _load_influx_config()
     if not config:
         return
@@ -36,8 +40,6 @@ def _apply_influx_defaults(args: argparse.Namespace) -> None:
         args.db_endpoint = config["db_endpoint"]
     if getattr(args, "db_org", None) is None and config.get("db_org"):
         args.db_org = config["db_org"]
-    if getattr(args, "db_bucket", None) is None and config.get("db_bucket"):
-        args.db_bucket = config["db_bucket"]
 
 
 def _artifact_dir(experiment_dir: Path, impl: str) -> Path:
@@ -135,6 +137,8 @@ def cmd_profile(args: argparse.Namespace) -> int:
     trials = max(1, int(args.trials))
     torch_kernel_times: list[float] = []
     nki_kernel_times: list[float] = []
+    torch_time_source: str | None = None
+    nki_time_source: str | None = None
 
     print("Compare mode: running hardware-profiled trials (first run may take 5–15+ min for Neuron compilation)...")
 
@@ -164,11 +168,12 @@ def cmd_profile(args: argparse.Namespace) -> int:
             if cap.stderr:
                 print(cap.stderr, file=sys.stderr)
             return 1
-        kt = capture.summarize_kernel_time(dest_neff_torch, ntff_path)
+        kt, src = capture.summarize_kernel_time(dest_neff_torch, ntff_path)
         if kt is None:
             print("Warning: unable to read kernel time for torch trial", i + 1, file=sys.stderr)
         else:
             torch_kernel_times.append(kt)
+            torch_time_source = src or torch_time_source
         last_ntff_torch = ntff_path
 
     # NKI trials
@@ -182,16 +187,23 @@ def cmd_profile(args: argparse.Namespace) -> int:
             if cap.stderr:
                 print(cap.stderr, file=sys.stderr)
             return 1
-        kt = capture.summarize_kernel_time(dest_neff_nki, ntff_path)
+        kt, src = capture.summarize_kernel_time(dest_neff_nki, ntff_path)
         if kt is None:
             print("Warning: unable to read kernel time for nki trial", i + 1, file=sys.stderr)
         else:
             nki_kernel_times.append(kt)
+            nki_time_source = src or nki_time_source
         last_ntff_nki = ntff_path
 
     report.print_compare_report(torch_kernel_times, nki_kernel_times)
     artifacts_dir = experiment_dir / "artifacts"
-    report_path = report.save_compare_report(artifacts_dir, torch_kernel_times, nki_kernel_times)
+    report_path = report.save_compare_report(
+        artifacts_dir,
+        torch_kernel_times,
+        nki_kernel_times,
+        torch_source=torch_time_source,
+        nki_source=nki_time_source,
+    )
     print("Report saved to", report_path)
 
     # For UI / ingest, keep the last NTFF for each impl as profile.ntff

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -29,9 +30,11 @@ def capture(
     ]
     if ignore_exec_errors:
         cmd.append("--ignore-exec-errors")
+    env = os.environ.copy()
     if enable_dge_notifs:
         cmd.append("--enable-dge-notifs")
-    return subprocess.run(cmd, capture_output=True, text=True)
+        env["NEURON_RT_ENABLE_DGE_NOTIFICATIONS"] = "1"
+    return subprocess.run(cmd, capture_output=True, text=True, env=env)
 
 
 def ingest(
@@ -63,8 +66,8 @@ def ingest(
     return subprocess.run(cmd, capture_output=True, text=True)
 
 
-def summarize_kernel_time(neff_path: Path, ntff_path: Path) -> float | None:
-    """Return kernel execution time (seconds) from summary-json, or None if unavailable."""
+def summarize_kernel_time(neff_path: Path, ntff_path: Path) -> tuple[float | None, str | None]:
+    """Return (kernel_time_seconds, source_field) from summary-json, or (None, None) if unavailable."""
     cmd = [
         find_neuron_profile(),
         "view",
@@ -77,27 +80,28 @@ def summarize_kernel_time(neff_path: Path, ntff_path: Path) -> float | None:
     ]
     proc = subprocess.run(cmd, capture_output=True, text=True)
     if proc.returncode != 0:
-        return None
+        return None, None
     # neuron-profile prints log lines before JSON; strip everything before first '{'
     text = proc.stdout
     first_brace = text.find("{")
     if first_brace == -1:
-        return None
+        return None, None
     payload = text[first_brace:]
     try:
         data = json.loads(payload)
     except json.JSONDecodeError:
-        return None
+        return None, None
 
-    # Current summary-json format is a dict keyed by profile/bucket id, e.g.:
-    # { "n_xxx": { "total_time": ..., "total_active_time": ..., ... } }
+    # Prefer total_time (device wall time): includes memory latency, DMA stalls, everything.
+    # total_active_time would hide idle/stall time and mislead kernel optimization.
+    # Format: { "n_xxx": { "total_time": ..., "total_active_time": ..., ... } }
     if not isinstance(data, dict) or not data:
-        return None
+        return None, None
     first_entry = next(iter(data.values()))
     if isinstance(first_entry, dict):
         if "total_time" in first_entry:
-            return float(first_entry["total_time"])
+            return float(first_entry["total_time"]), "total_time"
         if "total_active_time" in first_entry:
-            return float(first_entry["total_active_time"])
-    return None
+            return float(first_entry["total_active_time"]), "total_active_time"
+    return None, None
 

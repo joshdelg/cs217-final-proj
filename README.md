@@ -71,11 +71,7 @@ Alternatively, open the NEFF/NTFF files directly:
 
 ### Profile warnings you may see
 
-- **Missing DMA metadata / "DMA engine X queue Y is invalid"** — Capture didn’t include full DMA metadata. For more accurate DMA stats (and to reduce those errors), re-run with `--enable-dge-notifs`:
-  ```bash
-  python -m profiler profile example --mode compare --enable-dge-notifs
-  ```
-  On very busy kernels this can sometimes cause timeouts; if so, leave the flag off.
+- **Missing DMA metadata / "DMA engine X queue Y is invalid"** — The profiler already runs `neuron-profile capture` with `--enable-dge-notifs` and `NEURON_RT_ENABLE_DGE_NOTIFICATIONS=1`. If you still see this, you may be viewing an **old** NTFF (captured before that change). Re-run compare to generate new profiles: `python -m profiler profile example --mode compare`. New captures should have full DMA metadata.
 
 - **Missing compiler metrics in NEFF** — The profiler expects optional metadata (e.g. compiler version, high-level metrics) that newer compilers write into the NEFF. Your NEFF was built with whatever compiler is in your current env (e.g. the DLAMI’s venv). **This is only a warning:** the profile and timeline are still valid; you just don’t get some extra summary metrics in the UI.  
   **On an AWS instance:** The Neuron stack (neuronx-cc, aws-neuronx-tools, torch-neuronx) is often pinned to a specific SDK release. The compiler used by PyTorch XLA/NKI may be slightly older than what the installed `neuron-profile` expects for “compiler metrics,” so the warning is common and not a sign of a broken setup. To reduce or remove it you can: (1) Use a newer DLAMI or Neuron DLC that ships a matching/newer compiler and tools, or (2) Update the Neuron packages in your venv if your image allows it (`pip install -U neuronx-cc torch-neuronx`, then re-run your experiment and capture). If you’re on a fixed image, you can safely ignore the warning.

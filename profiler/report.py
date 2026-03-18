@@ -51,6 +51,9 @@ def save_compare_report(
     artifacts_dir: Path,
     torch_timings: list[float],
     nki_timings: list[float],
+    *,
+    torch_source: str | None = None,
+    nki_source: str | None = None,
 ) -> Path:
     """Write compare_report.json to artifacts dir and return path.
 
@@ -58,14 +61,24 @@ def save_compare_report(
     """
     torch_summary = aggregate_timings(torch_timings)
     torch_summary["runs"] = torch_timings
+    if torch_source:
+        torch_summary["time_source"] = torch_source
 
     nki_summary = aggregate_timings(nki_timings)
     nki_summary["runs"] = nki_timings
+    if nki_source:
+        nki_summary["time_source"] = nki_source
 
     out = {
         "torch": torch_summary,
         "nki": nki_summary,
     }
+    # Clarify what we measure: total_time = device wall time (includes memory latency).
+    if torch_source or nki_source:
+        out["_note"] = (
+            "total_time = device wall time (includes memory latency, DMA, stalls). "
+            "total_active_time = sum of engine-active intervals only (would hide memory cost)."
+        )
     report_path = artifacts_dir / "compare_report.json"
     report_path.parent.mkdir(parents=True, exist_ok=True)
     with open(report_path, "w") as f:
