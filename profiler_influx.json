@@ -1,0 +1,5 @@
+{
+  "db_endpoint": "http://localhost:8086",
+  "db_org": "joshdelg-cs217",
+  "db_bucket": "cs217"
+}
