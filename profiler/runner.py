@@ -46,7 +46,10 @@ def discover_neff(experiment_dir: Path, impl: str) -> Path | None:
     neffs = list(experiment_dir.glob("*.neff"))
     if not neffs:
         return None
-    return max(neffs, key=lambda p: p.stat().st_mtime)
+    # Some workloads may produce multiple NEFFs (e.g., compilation stubs or
+    # intermediate graphs). Prefer the largest NEFF file, which empirically
+    # corresponds to the fully-materialized kernel graph.
+    return max(neffs, key=lambda p: p.stat().st_size)
 
 
 def _clean_stale_neffs(experiment_dir: Path) -> None:
