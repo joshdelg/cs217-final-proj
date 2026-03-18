@@ -103,7 +103,7 @@ def _db_bucket_for_impl(
 
 def cmd_profile(args: argparse.Namespace) -> int:
     _apply_influx_defaults(args)
-    enable_dge = getattr(args, "enable_dge_notifs", False)
+    enable_dge = True
     experiments_root = Path(args.experiments_root).resolve() if args.experiments_root else None
     experiment_dir = runner.get_experiment_dir(args.experiment_name, experiments_root)
 
@@ -133,46 +133,94 @@ def cmd_profile(args: argparse.Namespace) -> int:
     have_db = bool(args.db_endpoint and args.db_org)
     do_ingest = (args.ingest or (not getattr(args, "no_ingest", False) and have_db))
     trials = max(1, int(args.trials))
-    torch_timings: list[float] = []
-    nki_timings: list[float] = []
+    torch_kernel_times: list[float] = []
+    nki_kernel_times: list[float] = []
 
-    print("Compare mode: running timing trials (first run may take 5–15+ min for Neuron compilation)...")
-    for i in range(trials):
-        print(f"  run_torch.py trial {i + 1}/{trials}...", flush=True)
-        proc, elapsed = runner.run_experiment(experiment_dir, "torch")
+    print("Compare mode: running hardware-profiled trials (first run may take 5–15+ min for Neuron compilation)...")
+
+    # Helper: ensure NEFF exists and copied into artifacts once per impl
+    def _prepare_neff(impl: str) -> tuple[Path, Path]:
+        neff, proc, _ = runner.run_and_discover_neff(experiment_dir, impl)
         if proc.returncode != 0:
-            print(proc.stderr or f"run_torch.py failed (trial {i+1})", file=sys.stderr)
-            return 1
-        torch_timings.append(elapsed)
+            if proc.stderr:
+                print(proc.stderr, file=sys.stderr)
+            raise RuntimeError(f"{impl}.py exited with code {proc.returncode}")
+        if not neff:
+            raise RuntimeError(f"No NEFF found for {impl}")
+        art = _artifact_dir(experiment_dir, impl)
+        art.mkdir(parents=True, exist_ok=True)
+        dest_neff = art / "model.neff"
+        shutil.copy2(neff, dest_neff)
+        return dest_neff, art
 
+    # Torch trials
+    dest_neff_torch, art_torch = _prepare_neff("torch")
+    last_ntff_torch: Path | None = None
     for i in range(trials):
-        print(f"  run_nki.py trial {i + 1}/{trials}...", flush=True)
-        proc, elapsed = runner.run_experiment(experiment_dir, "nki")
-        if proc.returncode != 0:
-            print(proc.stderr or f"run_nki.py failed (trial {i+1})", file=sys.stderr)
+        print(f"  [torch] trial {i + 1}/{trials} (kernel time)...", flush=True)
+        ntff_path = art_torch / f"profile_torch_trial_{i + 1}.ntff"
+        cap = capture.capture(dest_neff_torch, ntff_path, enable_dge_notifs=enable_dge)
+        if cap.returncode != 0:
+            if cap.stderr:
+                print(cap.stderr, file=sys.stderr)
             return 1
-        nki_timings.append(elapsed)
+        kt = capture.summarize_kernel_time(dest_neff_torch, ntff_path)
+        if kt is None:
+            print("Warning: unable to read kernel time for torch trial", i + 1, file=sys.stderr)
+        else:
+            torch_kernel_times.append(kt)
+        last_ntff_torch = ntff_path
 
-    report.print_compare_report(torch_timings, nki_timings)
+    # NKI trials
+    dest_neff_nki, art_nki = _prepare_neff("nki")
+    last_ntff_nki: Path | None = None
+    for i in range(trials):
+        print(f"  [nki]   trial {i + 1}/{trials} (kernel time)...", flush=True)
+        ntff_path = art_nki / f"profile_nki_trial_{i + 1}.ntff"
+        cap = capture.capture(dest_neff_nki, ntff_path, enable_dge_notifs=enable_dge)
+        if cap.returncode != 0:
+            if cap.stderr:
+                print(cap.stderr, file=sys.stderr)
+            return 1
+        kt = capture.summarize_kernel_time(dest_neff_nki, ntff_path)
+        if kt is None:
+            print("Warning: unable to read kernel time for nki trial", i + 1, file=sys.stderr)
+        else:
+            nki_kernel_times.append(kt)
+        last_ntff_nki = ntff_path
+
+    report.print_compare_report(torch_kernel_times, nki_kernel_times)
     artifacts_dir = experiment_dir / "artifacts"
-    report_path = report.save_compare_report(artifacts_dir, torch_timings, nki_timings)
+    report_path = report.save_compare_report(artifacts_dir, torch_kernel_times, nki_kernel_times)
     print("Report saved to", report_path)
 
-    # One full run + capture per impl for NEFF+NTFF
-    print("Capturing torch profile...")
-    _run_one_impl(
-        experiment_dir, "torch",
-        do_capture=True, do_ingest=do_ingest, enable_dge_notifs=enable_dge,
-        db_endpoint=args.db_endpoint, db_org=args.db_org,
-        db_bucket=args.db_bucket or _db_bucket_for_impl(args, experiment_dir, "torch", do_ingest=do_ingest),
-    )
-    print("Capturing nki profile...")
-    _run_one_impl(
-        experiment_dir, "nki",
-        do_capture=True, do_ingest=do_ingest, enable_dge_notifs=enable_dge,
-        db_endpoint=args.db_endpoint, db_org=args.db_org,
-        db_bucket=args.db_bucket or _db_bucket_for_impl(args, experiment_dir, "nki", do_ingest=do_ingest),
-    )
+    # For UI / ingest, keep the last NTFF for each impl as profile.ntff
+    if last_ntff_torch:
+        (art_torch / "profile.ntff").write_bytes(last_ntff_torch.read_bytes())
+    if last_ntff_nki:
+        (art_nki / "profile.ntff").write_bytes(last_ntff_nki.read_bytes())
+
+    # Optionally ingest profiles into InfluxDB
+    if do_ingest:
+        if last_ntff_torch:
+            capture.ingest(
+                dest_neff_torch,
+                art_torch / "profile.ntff",
+                db_endpoint=args.db_endpoint,
+                db_org=args.db_org,
+                db_bucket=args.db_bucket
+                or _db_bucket_for_impl(args, experiment_dir, "torch", do_ingest=True),
+            )
+        if last_ntff_nki:
+            capture.ingest(
+                dest_neff_nki,
+                art_nki / "profile.ntff",
+                db_endpoint=args.db_endpoint,
+                db_org=args.db_org,
+                db_bucket=args.db_bucket
+                or _db_bucket_for_impl(args, experiment_dir, "nki", do_ingest=True),
+            )
+
     print("Compare artifacts in", experiment_dir / "artifacts")
     if do_ingest and args.db_endpoint and args.db_org:
         print("Profiles ingested to InfluxDB. Start the viewer with the same org to see them:")
@@ -200,8 +248,6 @@ def main() -> int:
     p.add_argument("--ingest", action="store_true", help="Ingest profile into InfluxDB after capture")
     p.add_argument("--no-ingest", action="store_true",
                     help="In compare mode, disable ingest (ingest is on by default for compare)")
-    p.add_argument("--enable-dge-notifs", action="store_true",
-                    help="Capture with --enable-dge-notifs for more accurate DMA metadata (can cause timeouts on busy kernels)")
     p.add_argument("--profile-name", type=str, default=None,
                     help="Human-readable name for the profile (used as InfluxDB bucket when ingesting; default: experiment_impl e.g. example_torch)")
     p.add_argument("--db-endpoint", type=str, default=None, help="InfluxDB endpoint (e.g. http://localhost:8086)")

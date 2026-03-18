@@ -22,9 +22,26 @@ def print_compare_report(torch_timings: list[float], nki_timings: list[float]) -
     t = aggregate_timings(torch_timings)
     n = aggregate_timings(nki_timings)
     print("\n--- Compare report ---")
-    print(f"  torch  mean = {t['mean']:.4f} s  (n={t['n']})" + (f"  std = {t['std']:.4f} s" if t['std'] is not None else ""))
-    print(f"  nki    mean = {n['mean']:.4f} s  (n={n['n']})" + (f"  std = {n['std']:.4f} s" if n['std'] is not None else ""))
-    if t["mean"] and n["mean"] and n["mean"] > 0:
+    if t["mean"] is None or t["n"] == 0:
+        print("  torch  no kernel timings captured")
+    else:
+        print(
+            f"  torch  mean = {t['mean']:.6f} s  (n={t['n']})"
+            + (f"  std = {t['std']:.6f} s" if t["std"] is not None else "")
+        )
+    if n["mean"] is None or n["n"] == 0:
+        print("  nki    no kernel timings captured")
+    else:
+        print(
+            f"  nki    mean = {n['mean']:.6f} s  (n={n['n']})"
+            + (f"  std = {n['std']:.6f} s" if n["std"] is not None else "")
+        )
+    if (
+        t["mean"] is not None
+        and n["mean"] is not None
+        and t["mean"] > 0
+        and n["mean"] > 0
+    ):
         ratio = t["mean"] / n["mean"]
         print(f"  torch/nki  = {ratio:.3f}x")
     print("---\n")
@@ -35,10 +52,19 @@ def save_compare_report(
     torch_timings: list[float],
     nki_timings: list[float],
 ) -> Path:
-    """Write compare_report.json to artifacts dir and return path."""
+    """Write compare_report.json to artifacts dir and return path.
+
+    The report includes both summary stats and the raw timings for each run.
+    """
+    torch_summary = aggregate_timings(torch_timings)
+    torch_summary["runs"] = torch_timings
+
+    nki_summary = aggregate_timings(nki_timings)
+    nki_summary["runs"] = nki_timings
+
     out = {
-        "torch": aggregate_timings(torch_timings),
-        "nki": aggregate_timings(nki_timings),
+        "torch": torch_summary,
+        "nki": nki_summary,
     }
     report_path = artifacts_dir / "compare_report.json"
     report_path.parent.mkdir(parents=True, exist_ok=True)

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import shutil
 import subprocess
 from pathlib import Path
@@ -60,3 +61,43 @@ def ingest(
     if force:
         cmd.append("--force")
     return subprocess.run(cmd, capture_output=True, text=True)
+
+
+def summarize_kernel_time(neff_path: Path, ntff_path: Path) -> float | None:
+    """Return kernel execution time (seconds) from summary-json, or None if unavailable."""
+    cmd = [
+        find_neuron_profile(),
+        "view",
+        "-n",
+        str(neff_path),
+        "-s",
+        str(ntff_path),
+        "--output-format",
+        "summary-json",
+    ]
+    proc = subprocess.run(cmd, capture_output=True, text=True)
+    if proc.returncode != 0:
+        return None
+    # neuron-profile prints log lines before JSON; strip everything before first '{'
+    text = proc.stdout
+    first_brace = text.find("{")
+    if first_brace == -1:
+        return None
+    payload = text[first_brace:]
+    try:
+        data = json.loads(payload)
+    except json.JSONDecodeError:
+        return None
+
+    # Current summary-json format is a dict keyed by profile/bucket id, e.g.:
+    # { "n_xxx": { "total_time": ..., "total_active_time": ..., ... } }
+    if not isinstance(data, dict) or not data:
+        return None
+    first_entry = next(iter(data.values()))
+    if isinstance(first_entry, dict):
+        if "total_time" in first_entry:
+            return float(first_entry["total_time"])
+        if "total_active_time" in first_entry:
+            return float(first_entry["total_active_time"])
+    return None
+
