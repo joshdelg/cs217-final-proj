@@ -1,0 +1,26 @@
+HloModule SyncTensorsGraph.53
+
+ENTRY %SyncTensorsGraph.53 {
+  %p3.4 = f32[4096,64] parameter()
+  %p2.3 = s32[131072] parameter()
+  %p1.2 = f32[131072] parameter()
+  %p0.1 = f32[4096] parameter()
+  %custom-call.2 = f32[4096,64] custom-call(%p3.4, %p2.3, %p1.2, %p0.1)
+  %p5.19 = f32[64,64] parameter()
+  %transpose.20 = f32[64,64] transpose(%p5.19)
+  %dot.21 = f32[4096,64] dot(%custom-call.2, %transpose.20)
+  %p4.18 = f32[64] parameter()
+  %broadcast.25 = f32[4096,64] broadcast(%p4.18)
+  %add.26 = f32[4096,64] add(%dot.21, %broadcast.25)
+  %constant.27 = f32 constant()
+  %broadcast.28 = f32[4096,64] broadcast(%constant.27)
+  %maximum.29 = f32[4096,64] maximum(%add.26, %broadcast.28)
+  %custom-call.3 = f32[4096,64] custom-call(%maximum.29, %p2.3, %p1.2, %p0.1)
+  %p7.44 = f32[16,64] parameter()
+  %transpose.45 = f32[64,16] transpose(%p7.44)
+  %dot.46 = f32[4096,16] dot(%custom-call.3, %transpose.45)
+  %p6.43 = f32[16] parameter()
+  %broadcast.50 = f32[4096,16] broadcast(%p6.43)
+  %add.51 = f32[4096,16] add(%dot.46, %broadcast.50)
+  ROOT %tuple.52 = (f32[4096,64], f32[4096,64], f32[4096,64], f32[4096,16]) tuple(%custom-call.2, %maximum.29, %custom-call.3, %add.51)
+}

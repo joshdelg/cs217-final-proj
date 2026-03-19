@@ -1,0 +1,25 @@
+{
+  "torch": {
+    "mean": 0.010656592793333333,
+    "std": 9.591943509868582e-06,
+    "n": 3,
+    "runs": [
+      0.010652881688,
+      0.010667485832,
+      0.01064941086
+    ],
+    "time_source": "total_time"
+  },
+  "nki": {
+    "mean": 0.006864550940666667,
+    "std": 1.448591636730643e-06,
+    "n": 3,
+    "runs": [
+      0.006864485941,
+      0.006866030938,
+      0.006863135943
+    ],
+    "time_source": "total_time"
+  },
+  "_note": "total_time = device wall time (includes memory latency, DMA, stalls). total_active_time = sum of engine-active intervals only (would hide memory cost)."
+}

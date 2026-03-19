@@ -1,0 +1,83 @@
+HloModule IrToHlo.75, entry_computation_layout={(f32[4096,64]{1,0}, s64[131072]{0}, f32[131072]{0}, f32[64,64]{1,0}, f32[64]{0}, /*index=5*/f32[16,64]{1,0}, f32[16]{0}, s64[])->(f32[4096,64]{1,0}, s64[131072]{0}, f32[131072]{0}, f32[64,64]{1,0}, f32[64]{0}, /*index=5*/f32[16,64]{1,0}, f32[16]{0}, f32[4096,64]{1,0}, f32[4096,64]{1,0}, f32[4096,64]{1,0}, /*index=10*/f32[4096,16]{1,0})}
+
+%AddComputation.28 (x.29: f32[], y.30: f32[]) -> f32[] {
+  %x.29 = f32[] parameter(0)
+  %y.30 = f32[] parameter(1)
+  ROOT %add.31 = f32[] add(f32[] %x.29, f32[] %y.30)
+}
+
+%AddComputation.62 (x.63: f32[], y.64: f32[]) -> f32[] {
+  %x.63 = f32[] parameter(0)
+  %y.64 = f32[] parameter(1)
+  ROOT %add.65 = f32[] add(f32[] %x.63, f32[] %y.64)
+}
+
+ENTRY %IrToHlo.75 (p0.1: f32[4096,64], p1.2: s64[131072], p2.3: f32[131072], p3.4: f32[64,64], p4.5: f32[64], p5.6: f32[16,64], p6.7: f32[16], p7.9: s64[]) -> (f32[4096,64], s64[131072], f32[131072], f32[64,64], f32[64], /*index=5*/f32[16,64], f32[16], f32[4096,64], f32[4096,64], f32[4096,64], /*index=10*/f32[4096,16]) {
+  %constant.27 = s32[] constant(32)
+  %constant.61 = s32[] constant(32)
+  %p0.1 = f32[4096,64]{1,0} parameter(0)
+  %p1.2 = s64[131072]{0} parameter(1)
+  %p2.3 = f32[131072]{0} parameter(2)
+  %p3.4 = f32[64,64]{1,0} parameter(3)
+  %p4.5 = f32[64]{0} parameter(4)
+  %p5.6 = f32[16,64]{1,0} parameter(5)
+  %p6.7 = f32[16]{0} parameter(6)
+  %constant.15 = s64[] constant(0)
+  %broadcast.16 = s64[131072]{0} broadcast(s64[] %constant.15), dimensions={}
+  %compare.17 = pred[131072]{0} compare(s64[131072]{0} %p1.2, s64[131072]{0} %broadcast.16), direction=LT
+  %p7.9 = s64[] parameter(7)
+  %reshape.10 = s64[1]{0} reshape(s64[] %p7.9)
+  %broadcast.11 = s64[1]{0} broadcast(s64[1]{0} %reshape.10), dimensions={0}
+  %reshape.12 = s64[] reshape(s64[1]{0} %broadcast.11)
+  %broadcast.13 = s64[131072]{0} broadcast(s64[] %reshape.12), dimensions={}
+  %add.14 = s64[131072]{0} add(s64[131072]{0} %p1.2, s64[131072]{0} %broadcast.13)
+  %select.18 = s64[131072]{0} select(pred[131072]{0} %compare.17, s64[131072]{0} %add.14, s64[131072]{0} %p1.2)
+  %reshape.19 = s64[131072,1]{1,0} reshape(s64[131072]{0} %select.18)
+  %concatenate.20 = s64[131072,1]{1,0} concatenate(s64[131072,1]{1,0} %reshape.19), dimensions={1}
+  %gather.21 = f32[131072,64]{1,0} gather(f32[4096,64]{1,0} %p0.1, s64[131072,1]{1,0} %concatenate.20), offset_dims={1}, collapsed_slice_dims={0}, start_index_map={0}, index_vector_dim=1, slice_sizes={1,64}
+  %reshape.8 = f32[131072,1]{1,0} reshape(f32[131072]{0} %p2.3)
+  %reshape.22 = f32[131072]{0} reshape(f32[131072,1]{1,0} %reshape.8)
+  %broadcast.23 = f32[131072,64]{1,0} broadcast(f32[131072]{0} %reshape.22), dimensions={0}
+  %multiply.24 = f32[131072,64]{1,0} multiply(f32[131072,64]{1,0} %gather.21, f32[131072,64]{1,0} %broadcast.23)
+  %reshape.25 = f32[4096,32,64]{2,1,0} reshape(f32[131072,64]{1,0} %multiply.24)
+  %constant.26 = f32[] constant(0)
+  %reduce.32 = f32[4096,64]{1,0} reduce(f32[4096,32,64]{2,1,0} %reshape.25, f32[] %constant.26), dimensions={1}, to_apply=%AddComputation.28
+  %transpose.33 = f32[64,64]{0,1} transpose(f32[64,64]{1,0} %p3.4), dimensions={1,0}
+  %dot.34 = f32[4096,64]{1,0} dot(f32[4096,64]{1,0} %reduce.32, f32[64,64]{0,1} %transpose.33), lhs_contracting_dims={1}, rhs_contracting_dims={0}
+  %reshape.35 = f32[1,64]{1,0} reshape(f32[64]{0} %p4.5)
+  %broadcast.36 = f32[1,64]{1,0} broadcast(f32[1,64]{1,0} %reshape.35), dimensions={0,1}
+  %reshape.37 = f32[64]{0} reshape(f32[1,64]{1,0} %broadcast.36)
+  %broadcast.38 = f32[4096,64]{1,0} broadcast(f32[64]{0} %reshape.37), dimensions={1}
+  %add.39 = f32[4096,64]{1,0} add(f32[4096,64]{1,0} %dot.34, f32[4096,64]{1,0} %broadcast.38)
+  %constant.40 = f32[] constant(0)
+  %broadcast.41 = f32[4096,64]{1,0} broadcast(f32[] %constant.40), dimensions={}
+  %maximum.42 = f32[4096,64]{1,0} maximum(f32[4096,64]{1,0} %add.39, f32[4096,64]{1,0} %broadcast.41)
+  %constant.49 = s64[] constant(0)
+  %broadcast.50 = s64[131072]{0} broadcast(s64[] %constant.49), dimensions={}
+  %compare.51 = pred[131072]{0} compare(s64[131072]{0} %p1.2, s64[131072]{0} %broadcast.50), direction=LT
+  %reshape.44 = s64[1]{0} reshape(s64[] %p7.9)
+  %broadcast.45 = s64[1]{0} broadcast(s64[1]{0} %reshape.44), dimensions={0}
+  %reshape.46 = s64[] reshape(s64[1]{0} %broadcast.45)
+  %broadcast.47 = s64[131072]{0} broadcast(s64[] %reshape.46), dimensions={}
+  %add.48 = s64[131072]{0} add(s64[131072]{0} %p1.2, s64[131072]{0} %broadcast.47)
+  %select.52 = s64[131072]{0} select(pred[131072]{0} %compare.51, s64[131072]{0} %add.48, s64[131072]{0} %p1.2)
+  %reshape.53 = s64[131072,1]{1,0} reshape(s64[131072]{0} %select.52)
+  %concatenate.54 = s64[131072,1]{1,0} concatenate(s64[131072,1]{1,0} %reshape.53), dimensions={1}
+  %gather.55 = f32[131072,64]{1,0} gather(f32[4096,64]{1,0} %maximum.42, s64[131072,1]{1,0} %concatenate.54), offset_dims={1}, collapsed_slice_dims={0}, start_index_map={0}, index_vector_dim=1, slice_sizes={1,64}
+  %reshape.43 = f32[131072,1]{1,0} reshape(f32[131072]{0} %p2.3)
+  %reshape.56 = f32[131072]{0} reshape(f32[131072,1]{1,0} %reshape.43)
+  %broadcast.57 = f32[131072,64]{1,0} broadcast(f32[131072]{0} %reshape.56), dimensions={0}
+  %multiply.58 = f32[131072,64]{1,0} multiply(f32[131072,64]{1,0} %gather.55, f32[131072,64]{1,0} %broadcast.57)
+  %reshape.59 = f32[4096,32,64]{2,1,0} reshape(f32[131072,64]{1,0} %multiply.58)
+  %constant.60 = f32[] constant(0)
+  %reduce.66 = f32[4096,64]{1,0} reduce(f32[4096,32,64]{2,1,0} %reshape.59, f32[] %constant.60), dimensions={1}, to_apply=%AddComputation.62
+  %transpose.67 = f32[64,16]{0,1} transpose(f32[16,64]{1,0} %p5.6), dimensions={1,0}
+  %dot.68 = f32[4096,16]{1,0} dot(f32[4096,64]{1,0} %reduce.66, f32[64,16]{0,1} %transpose.67), lhs_contracting_dims={1}, rhs_contracting_dims={0}
+  %reshape.69 = f32[1,16]{1,0} reshape(f32[16]{0} %p6.7)
+  %broadcast.70 = f32[1,16]{1,0} broadcast(f32[1,16]{1,0} %reshape.69), dimensions={0,1}
+  %reshape.71 = f32[16]{0} reshape(f32[1,16]{1,0} %broadcast.70)
+  %broadcast.72 = f32[4096,16]{1,0} broadcast(f32[16]{0} %reshape.71), dimensions={1}
+  %add.73 = f32[4096,16]{1,0} add(f32[4096,16]{1,0} %dot.68, f32[4096,16]{1,0} %broadcast.72)
+  ROOT %tuple.74 = (f32[4096,64]{1,0}, s64[131072]{0}, f32[131072]{0}, f32[64,64]{1,0}, f32[64]{0}, /*index=5*/f32[16,64]{1,0}, f32[16]{0}, f32[4096,64]{1,0}, f32[4096,64]{1,0}, f32[4096,64]{1,0}, /*index=10*/f32[4096,16]{1,0}) tuple(f32[4096,64]{1,0} %p0.1, s64[131072]{0} %p1.2, f32[131072]{0} %p2.3, f32[64,64]{1,0} %p3.4, f32[64]{0} %p4.5, /*index=5*/f32[16,64]{1,0} %p5.6, f32[16]{0} %p6.7, f32[4096,64]{1,0} %reduce.32, f32[4096,64]{1,0} %maximum.42, f32[4096,64]{1,0} %reduce.66, /*index=10*/f32[4096,16]{1,0} %add.73)
+}
+
