@@ -1,0 +1,27 @@
+digraph G {
+  rankdir=TB;
+  concentrate=true;
+  label="Before Optimisations  [torch]\nModule: IrToHlo.8\n7 instructions";
+  labelloc=t; fontsize=16;
+  node [style=filled, fontsize=9, fontname="Helvetica"];
+  edge [arrowsize=0.4, color="#666666"];
+  n_p0_1 [label="parameter\nf32[256,1024]", fillcolor="#B3D9FF", shape=box];
+  n_p1_2 [label="parameter\nf32[256,1024]", fillcolor="#B3D9FF", shape=box];
+  n_constant_3 [label="constant\nf32[]", fillcolor="#E0E0E0", shape=plaintext];
+  n_broadcast_4 [label="broadcast\nf32[256,1024]", fillcolor="#FFF9C4", shape=box];
+  n_multiply_5 [label="multiply\nf32[256,1024]", fillcolor="#C5E1A5", shape=ellipse];
+  n_add_6 [label="add\nf32[256,1024]", fillcolor="#C5E1A5", shape=ellipse];
+  n_tuple_7 [label="tuple\n(f32[256,1024], f32[256,1024], f32[256,1024])", fillcolor="#F5F5F5", shape=box, penwidth=3];
+  n_constant_3 -> n_broadcast_4;
+  n_p1_2 -> n_multiply_5;
+  n_broadcast_4 -> n_multiply_5;
+  n_p0_1 -> n_add_6;
+  n_multiply_5 -> n_add_6;
+  n_p0_1 -> n_tuple_7;
+  n_p1_2 -> n_tuple_7;
+  n_add_6 -> n_tuple_7;
+  subgraph cluster_legend {
+    label="Op Counts"; style=dashed; fontsize=11;
+    legend [label="parameter: 2\lconstant: 1\lbroadcast: 1\lmultiply: 1\ladd: 1\ltuple: 1\l", shape=note, fillcolor="#FFFDE7", fontsize=8];
+  }
+}

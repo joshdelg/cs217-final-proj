@@ -8,7 +8,7 @@ import shutil
 import sys
 from pathlib import Path
 
-from . import capture, report, runner
+from . import capture, hlo_extract, report, runner
 
 CONFIG_FILENAME = "profiler_influx.json"
 
@@ -250,10 +250,28 @@ def cmd_profile(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_hlo(args: argparse.Namespace) -> int:
+    """Extract and visualise HLO graphs for an experiment."""
+    experiments_root = Path(args.experiments_root).resolve() if args.experiments_root else None
+    experiment_dir = runner.get_experiment_dir(args.experiment_name, experiments_root)
+    force = getattr(args, "force", True)
+
+    images = hlo_extract.extract_and_visualize(
+        experiment_dir, args.impl, force_recompile=force,
+    )
+    if not images:
+        return 1
+
+    for stage, path in images.items():
+        print(f"  {stage}: {path}")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Profile PyTorch vs NKI experiments on Trainium.")
     sub = parser.add_subparsers(dest="command", required=True)
 
+    # ── profile subcommand ──
     p = sub.add_parser("profile", help="Run and profile an experiment")
     p.add_argument("experiment_name", help="Name of experiment (subdir under experiments/)")
     p.add_argument("--mode", choices=["torch", "nki", "compare"], default="compare",
@@ -276,9 +294,24 @@ def main() -> int:
                          "by default only NKI NEFFs are cleaned)")
     p.set_defaults(handler=cmd_profile)
 
+    # ── hlo subcommand ──
+    h = sub.add_parser("hlo", help="Extract and visualise XLA HLO graphs (before/after optimisation)")
+    h.add_argument("experiment_name", help="Name of experiment (subdir under experiments/)")
+    h.add_argument("--impl", choices=["torch", "nki"], required=True,
+                   help="Which implementation to extract HLO for")
+    h.add_argument("--experiments-root", type=str, default=None,
+                   help="Root directory for experiments (default: repo experiments/)")
+    h.add_argument("--force", action="store_true", default=True,
+                   help="Force recompile to ensure fresh HLO dumps (default: true)")
+    h.add_argument("--no-force", action="store_false", dest="force",
+                   help="Skip recompile if cached NEFF exists")
+    h.set_defaults(handler=cmd_hlo)
+
     args = parser.parse_args()
-    if args.command == "profile":
-        return cmd_profile(args)
+    handler = getattr(args, "handler", None)
+    if handler:
+        return handler(args)
+    parser.print_help()
     return 0
 
 

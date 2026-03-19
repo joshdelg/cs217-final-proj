@@ -1,0 +1,8 @@
+HloModule SyncTensorsGraph.8
+
+ENTRY %SyncTensorsGraph.8 {
+  %p1.3 = f32[256,1024] parameter()
+  %p0.2 = f32[256,1024] parameter()
+  %add.6 = f32[256,1024] add(%p1.3, %p0.2)
+  ROOT %tuple.7 = (f32[256,1024]) tuple(%add.6)
+}
