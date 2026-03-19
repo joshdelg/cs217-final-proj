@@ -40,3 +40,12 @@ Practical takeaway:
 - Use HLO to identify missing high-level fusion and extra intermediates.
 - Use profile metrics to validate whether backend lowering achieved efficient tiling/chunking in practice.
 
+## Wall-Clock vs Profile `total_time` (Don't Over-Interpret)
+Timing measured on the host (e.g., wall-clock around `neuron-profile capture`) is **not** the same as the device-side kernel timing reported by the profiler (`summary-json` field `total_time`).
+
+In our v5 runs, host capture wall-clock was about:
+- `~8.14s` (torch) vs `~0.00593s` device `total_time` (about **~1.4e3x** larger)
+- `~8.71s` (nki) vs `~0.00354s` device `total_time` (about **~2.5e3x** larger)
+
+So if you see wall-clock that is orders of magnitude larger, that makes sense even when the kernel itself only takes milliseconds; it does *not* mean “kernel launch is that expensive”.
+

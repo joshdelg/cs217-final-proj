@@ -54,3 +54,19 @@ python experiments/graphsage_gather_scatter_mean_exaggerated/run_nki.py
 
 - This experiment intentionally stresses aggregation bandwidth/packet behavior to make custom-kernel impact easier to see.
 - Keep comparisons fair by changing shape knobs for both implementations together.
+
+## Wall-Clock vs Profile `total_time` (Don't Over-Interpret)
+Host-side wall-clock measurements (for example, timing `neuron-profile capture` with `/usr/bin/time` or shell timing) are not directly comparable to the device-side kernel timing in the profiler (`summary-json` field `total_time`).
+
+In one v5 end-to-end check, host capture wall-clock was about `~8–9s` while device `total_time` was `~0.0035–0.0059s` (roughly **~1.4e3x–2.5e3x** larger).
+
+So orders-of-magnitude wall-clock gaps can be totally expected without implying the kernel launch itself is that expensive.
+
+## Speedup matrix
+
+| TILE_NODES \ GMM_D_CHUNK | 16 | 32 |
+|---|---|---|
+| 128 | 1.55x | 1.55x |
+
+Speedup definition: `torch_total_time_mean / nki_total_time_mean` (profiler compare mode, Neuron `total_time`), with fixed workload defaults and sweeping `GMM_TILE_NODES` + `GMM_D_CHUNK`.
+

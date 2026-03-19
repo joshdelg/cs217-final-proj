@@ -1,0 +1,29 @@
+{
+  "shape_defaults": {
+    "NUM_NODES": 8192,
+    "AVG_DEGREE": 24,
+    "FEAT_DIM": 128,
+    "SEED": 42,
+    "MAX_DEG": null
+  },
+  "trials": 3,
+  "tile_nodes": [
+    128
+  ],
+  "d_chunks": [
+    16,
+    32
+  ],
+  "results": {
+    "128,16": {
+      "torch_mean_s": 0.010665416113333333,
+      "nki_mean_s": 0.006874749258,
+      "speedup": 1.551389834461557
+    },
+    "128,32": {
+      "torch_mean_s": 0.010658143902333333,
+      "nki_mean_s": 0.0068638703859999995,
+      "speedup": 1.5527892140959396
+    }
+  }
+}

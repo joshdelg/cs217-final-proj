@@ -15,6 +15,32 @@ Each experiment lives under `experiments/<name>/` with two entrypoints:
 
 Both are runnable standalone: `python run_torch.py` / `python run_nki.py` from the experiment directory. (Names avoid shadowing the `torch` package.)
 
+## Overall GNN Experiment Structure
+The GNNs that we experiment with all have the following structure:
+- Graphs consist of nodes and edges
+- Edges have "feature vectors" (like weights, but vectors)
+Each GNN has the following as a fundamental layer:
+- For each node:
+  - Collect the feature vector for each incoming edge
+  - Aggregate these feature vectors somehow (max, sum, avg, etc.)
+How this is done depends on how we choose to represent the graph structure. In our experiments, we generate random graphs by:
+- Generating src: (num_edges,), dst: (num_edges,), where edge 0 is between `src[0]` and `dst[0]`.
+- Generating the features. Generate x: (num_nodes, feature_dim)
+
+## Experiments Index (Quick TOC)
+Use these READMEs as the running table of contents for what each experiment tests:
+
+- `experiments/graphsage_gather_scatter_mean/` — first faster GraphSAGE neighbor-aggregation (v1): on-device gather fused with NKI; compare report shows about `1.09x` speedup.
+- `experiments/graphsage_gather_scatter_mean_v2/` — v2 “Option 2” accumulation strategy; exploration / tuning (does not claim the main end-to-end speedup).
+- `experiments/graphsage_gather_scatter_mean_v3/` — v3 mask-loading variant; exploration / tuning (does not claim the main end-to-end speedup).
+- `experiments/graphsage_gather_scatter_mean_v4/` — v4 src-block reordering; exploration / tuning (does not claim the main end-to-end speedup).
+- `experiments/graphsage_gather_scatter_mean_v5/` — full 2-layer GraphSAGE end-to-end: only the neighbor aggregation is swapped to NKI while linear layers + ReLU stay in PyTorch.
+- `experiments/graphsage_gather_scatter_mean_exaggerated/` — same neighbor-aggregation core, but with heavier default shapes; includes the speedup-matrix harness.
+- `experiments/gcn_nki/` — 2-layer GCN with NKI aggregation + PyTorch MLP blocks.
+- `experiments/gcn_fx_rewrite/` — 2-layer GCN where aggregation is auto-rewritten via `torch.fx` to an NKI kernel call.
+- `experiments/gcn_fx_toggle/` — side-by-side profiling for FX rewrite vs a toggle (see README for modes).
+- `experiments/gin_nki/` — 2-layer GIN with NKI aggregation.
+
 ## Profiler
 
 **InfluxDB defaults:** Create or edit `profiler_influx.json` in the repo root with your InfluxDB settings so you don't need to pass `--db-endpoint` / `--db-org` / `--db-bucket` every time:
