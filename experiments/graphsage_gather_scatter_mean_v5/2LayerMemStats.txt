@@ -1,0 +1,21 @@
+Created cs217-final-proj/experiments/graphsage_gather_scatter_mean_v5/ with an end-to-end 2-layer GraphSAGE forward:
+run_torch.py: fully PyTorch end-to-end, including mean neighbor aggregation implemented with the same padded src_padded/mask_padded/inv_degree representation.
+run_nki.py: replaces only the neighbor aggregation step (twice: layer1 and layer2) with your v1/Option-1 style NKI gather_mean_nki kernel; linear layers + ReLU remain PyTorch.
+Both scripts build CPU tensors (src_padded/mask_padded/inv_degree) outside the profiled device execution; run_nki.py also computes a CPU reference for correctness to avoid polluting the NEFF.
+Correctness
+run_nki.py matched the full Torch reference with max abs diff ~7.45e-09.
+End-to-end profiling (--mode compare --trials 1 --force --no-ingest)
+Torch total_time: 0.005926 s
+NKI total_time: 0.003539 s
+Speedup: 1.675x
+Key end-to-end deltas (from v5 summary-json)
+DMA transfers: NKI is doing fewer and larger DMA transfers
+dma_transfer_count: 2628 (torch) vs 2088 (nki)
+dma_transfer_average_bytes: 28,672 (torch) vs 38,354 (nki)
+dma_active_time: 0.003509 s (torch) vs 0.003462 s (nki)
+Compute engines: NKI eliminates most of the heavy engine time coming from Torch’s neighbor-aggregation decomposition
+scalar_engine_active_time: 0.004232 s (torch) vs 0.000961 s (nki)
+tensor_engine_active_time: 0.003574 s (torch) vs 0.000082 s (nki)
+Interpretation
+After substituting the neighbor aggregation with your NKI kernel, the whole model becomes almost purely DMA-bound (NKI total_time ≈ dma_active_time), so further speedups will likely require improving the irregular gather/transfer efficiency (i.e., more coalescing / fewer transfers / better scheduling), not just reducing compute.
+Next suggestion: do you want to tune the v1 kernel’s GATHER_MEAN_D_CHUNK specifically for this end-to-end setting (v5 uses v1-style default 32, but it’s already parameterized via env var)?
