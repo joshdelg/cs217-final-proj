@@ -1,0 +1,14 @@
+HloModule IrToHlo.10, entry_computation_layout={(f32[4096,64]{1,0}, s32[131072]{0}, f32[131072]{0}, f32[4096]{0}, f32[64,64]{1,0}, /*index=5*/f32[64]{0}, f32[16,64]{1,0}, f32[16]{0})->(f32[4096,64]{1,0}, s32[131072]{0}, f32[131072]{0}, f32[4096]{0}, f32[64,64]{1,0}, /*index=5*/f32[64]{0}, f32[16,64]{1,0}, f32[16]{0})}
+
+ENTRY %IrToHlo.10 (p0.1: f32[4096,64], p1.2: s32[131072], p2.3: f32[131072], p3.4: f32[4096], p4.5: f32[64,64], p5.6: f32[64], p6.7: f32[16,64], p7.8: f32[16]) -> (f32[4096,64], s32[131072], f32[131072], f32[4096], f32[64,64], /*index=5*/f32[64], f32[16,64], f32[16]) {
+  %p0.1 = f32[4096,64]{1,0} parameter(0), metadata={op_type="xla__device_data" op_name="xla__device_data" source_file="/home/ubuntu/cs217-final-proj/experiments/gcn_nki/run_nki.py" source_line=166}
+  %p1.2 = s32[131072]{0} parameter(1), metadata={op_type="xla__device_data" op_name="xla__device_data" source_file="/home/ubuntu/cs217-final-proj/experiments/gcn_nki/run_nki.py" source_line=167}
+  %p2.3 = f32[131072]{0} parameter(2), metadata={op_type="xla__device_data" op_name="xla__device_data" source_file="/home/ubuntu/cs217-final-proj/experiments/gcn_nki/run_nki.py" source_line=168}
+  %p3.4 = f32[4096]{0} parameter(3), metadata={op_type="xla__device_data" op_name="xla__device_data" source_file="/home/ubuntu/cs217-final-proj/experiments/gcn_nki/run_nki.py" source_line=169}
+  %p4.5 = f32[64,64]{1,0} parameter(4), metadata={op_type="xla__device_data" op_name="xla__device_data" source_file="/home/ubuntu/cs217-final-proj/experiments/gcn_nki/run_nki.py" source_line=170}
+  %p5.6 = f32[64]{0} parameter(5), metadata={op_type="xla__device_data" op_name="xla__device_data" source_file="/home/ubuntu/cs217-final-proj/experiments/gcn_nki/run_nki.py" source_line=171}
+  %p6.7 = f32[16,64]{1,0} parameter(6), metadata={op_type="xla__device_data" op_name="xla__device_data" source_file="/home/ubuntu/cs217-final-proj/experiments/gcn_nki/run_nki.py" source_line=172}
+  %p7.8 = f32[16]{0} parameter(7), metadata={op_type="xla__device_data" op_name="xla__device_data" source_file="/home/ubuntu/cs217-final-proj/experiments/gcn_nki/run_nki.py" source_line=173}
+  ROOT %tuple.9 = (f32[4096,64]{1,0}, s32[131072]{0}, f32[131072]{0}, f32[4096]{0}, f32[64,64]{1,0}, /*index=5*/f32[64]{0}, f32[16,64]{1,0}, f32[16]{0}) tuple(f32[4096,64]{1,0} %p0.1, s32[131072]{0} %p1.2, f32[131072]{0} %p2.3, f32[4096]{0} %p3.4, f32[64,64]{1,0} %p4.5, /*index=5*/f32[64]{0} %p5.6, f32[16,64]{1,0} %p6.7, f32[16]{0} %p7.8)
+}
+
