@@ -1,0 +1,8 @@
+COMMAND:
+/opt/aws_neuronx_venv_pytorch_2_9/bin/python3 -m profiler profile graphsage_gather_scatter_mean_v2 --mode nki --force
+
+STDOUT:
+NKI: run + capture done. Artifacts in /home/ubuntu/cs217-final-proj/experiments/graphsage_gather_scatter_mean_v2/artifacts/nki
+
+
+STDERR:
