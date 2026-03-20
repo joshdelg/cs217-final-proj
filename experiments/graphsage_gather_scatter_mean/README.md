@@ -36,17 +36,31 @@ From `artifacts/torch/summary.json`:
 - `hbm_write_bytes ~= 70.3 MB`
 - `software_dynamic_dma_packet_count ~= 52,128`
 
+### Torch vs NKI: memory-traffic comparison (v1)
+The same metrics from `artifacts/nki/summary.json`:
+
+| Metric | Torch | NKI | Improvement (Torch -> NKI) |
+|---|---:|---:|---|
+| `total_time` | ~1.897 ms | ~1.736 ms | `-8.51%` (~1.093x faster) |
+| `dma_active_time_percent` | ~98.25% | ~98.91% | `+0.67% points` (still DMA-paced) |
+| `mbu_estimated_percent` | ~0.078% | ~0.029% | `-63.19%` (~2.717x lower) |
+| `hbm_read_bytes` | ~35.7 MB | ~34.6 MB | `-2.94%` (~1.030x lower) |
+| `hbm_write_bytes` | ~70.3 MB | ~1.05 MB | `-98.51%` (~67x lower) |
+| `software_dynamic_dma_packet_count` | ~52,128 | ~33,344 | `-36.03%` (~1.563x fewer) |
+
 Interpretation:
 - The workload is strongly **DMA/memory paced** (not tensor-engine limited).
 - Very low MBU + many DMA packets suggests command-stream/pacing overhead and
   irregular access behavior dominate more than raw arithmetic throughput.
 - High HBM writes indicate heavy intermediate materialization in the staged
-  Torch flow (`gather -> mask -> view -> sum -> mean`).
+  Torch flow (`gather -> mask -> view -> sum -> mean`). With NKI, HBM writes
+  drop by roughly **~67x** (~70.3 MB -> ~1.05 MB), and dynamic DMA packet
+  transactions drop by roughly **~1.56x** (~52,128 -> ~33,344).
 
 ### 2) Optimization hypothesis
 
 If we fuse gather+mask+segment-reduce+mean in one NKI kernel and keep the
-partial reduction on-chip, we should:
+partial reduction on-chip, we should: 
 - ****reduce intermediate HBM round-trips,
 - reduce orchestration overhead between separate graph ops,
 - improve end-to-end `total_time` even if still DMA-bound.

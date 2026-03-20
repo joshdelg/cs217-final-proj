@@ -18,14 +18,14 @@ Both are runnable standalone: `python run_torch.py` / `python run_nki.py` from t
 ## Overall GNN Experiment Structure
 The GNNs that we experiment with all have the following structure:
 - Graphs consist of nodes and edges
-- Edges have "feature vectors" (like weights, but vectors)
+- Nodes have "feature vectors"
 Each GNN has the following as a fundamental layer:
 - For each node:
   - Collect the feature vector for each incoming edge
   - Aggregate these feature vectors somehow (max, sum, avg, etc.)
 How this is done depends on how we choose to represent the graph structure. In our experiments, we generate random graphs by:
 - Generating src: (num_edges,), dst: (num_edges,), where edge 0 is between `src[0]` and `dst[0]`.
-- Generating the features. Generate x: (num_nodes, feature_dim)
+- Generating the node features. Generate x: (num_nodes, feature_dim)
 
 ## Experiments Index (Quick TOC)
 Use these READMEs as the running table of contents for what each experiment tests:
@@ -40,6 +40,16 @@ Use these READMEs as the running table of contents for what each experiment test
 - `experiments/gcn_fx_rewrite/` — 2-layer GCN where aggregation is auto-rewritten via `torch.fx` to an NKI kernel call.
 - `experiments/gcn_fx_toggle/` — side-by-side profiling for FX rewrite vs a toggle (see README for modes).
 - `experiments/gin_nki/` — 2-layer GIN with NKI aggregation.
+
+## Torch vs NKI Results (Average `total_time`)
+Device-side kernel timings from each experiment’s `artifacts/compare_report.json` (time source: `total_time`):
+
+| Experiment | NKI avg time (s) | Torch avg time (s) | Speedup (Torch / NKI) |
+|---|---:|---:|---:|
+| `scatter_add` | 0.000139 | 0.000159 | 1.141x |
+| `graphsage_gather_scatter_mean` | 0.001737 | 0.001900 | 1.094x |
+| `gcn_nki` | 0.003510 | 0.005187 | 1.478x |
+| `gin_nki` | 0.003525 | 0.005223 | 1.482x |
 
 ## Profiler
 
